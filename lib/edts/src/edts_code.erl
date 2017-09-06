@@ -115,12 +115,12 @@ compile_and_load(Module, Opts) when is_atom(Module)->
   File = proplists:get_value(source, Module:module_info(compile)),
   compile_and_load(File, Opts);
 compile_and_load(File0, Opts) ->
-  {ok, Cwd}   = file:get_cwd(),
+  {ok, Cwd} = file:get_cwd(),
   File = case lists:prefix(Cwd, File0) of
            true  -> lists:nthtail(length(Cwd) + 1, File0);
            false -> File0
          end,
-  OutDir  = get_compile_outdir(File0),
+  OutDir = get_compile_outdir(File0),
   reload_if_modified(File0, OutDir),
   OldOpts = extract_compile_opts(File),
 
@@ -361,7 +361,7 @@ update_paths() ->
   {ok, ProjectRoot} = application:get_env(edts, project_root_dir),
   {ok, LibDirs} = application:get_env(edts, project_lib_dirs),
   Paths = edts_util:expand_code_paths(ProjectRoot, LibDirs),
-  lists:foreach(fun code:add_path/1, Paths).
+  lists:foreach(fun code:add_patha/1, Paths).
 
 
 %%------------------------------------------------------------------------------
@@ -561,29 +561,22 @@ do_module_modified_mtime_p({time,
                            {ok, #file_info{mtime = MTime}}) ->
   MTime > {{CYear, CMonth, CDay}, {CHour, CMinute, CSecond}}.
 
+
 get_compile_outdir(File) ->
   Mod  = list_to_atom(filename:basename(filename:rootname(File))),
-  Opts = try proplists:get_value(options, Mod:module_info(compile), [])
-         catch error:undef -> [] %% No beam-file
-         end,
-  get_compile_outdir(File, Opts).
+  take_first([fun() -> filename:dirname(code:which(Mod)) end,
+              fun take_first_ebin/0,
+              fun() -> filename:dirname(File) end]).
 
-get_compile_outdir(File, Opts) ->
-  case proplists:get_value(outdir, Opts) of
-    undefined -> filename_to_outdir(File);
-    OutDir    ->
-      case filelib:is_dir(OutDir) of
-        true  -> OutDir;
-        false -> filename_to_outdir(File)
-      end
-  end.
+take_first_ebin() ->
+  {ok, Project} = application:get_env(edts,project_name),
+  Pattern = filename:join(Project, ebin),
+  hd([D || D <- code:get_path(), is_list(string:find(D, Pattern))]).
 
-filename_to_outdir(File) ->
-  DirName = filename:dirname(File),
-  EbinDir = filename:join([DirName, "..", "ebin"]),
-  case filelib:is_dir(EbinDir) of
-    true  -> EbinDir;
-    false -> DirName
+take_first([]) -> error({take_first, nothing_worked});
+take_first([Fun|Funs]) ->
+  try Fun()
+  catch _:_ -> take_first(Funs)
   end.
 
 
@@ -1091,24 +1084,6 @@ parse_abstract_other_test_() ->
 
 modules_test_() ->
   [?_assertMatch([_|_], modules())].
-
-get_compile_outdir_test_() ->
-  Good = "good/../ebin",
-  F    = fun get_compile_outdir/2,
-  [{ setup,
-     fun () ->
-         meck:new(filelib, [passthrough, unstick]),
-         meck:expect(filelib, is_dir, fun ("good/../ebin") -> true;
-                                          (_)              -> false
-                                       end)
-     end,
-     fun (_) -> meck:unload() end,
-     [ ?_assertEqual(Good , F("foo/mod.erl" , [{outdir, Good}])),
-       ?_assertEqual(Good , F("good/mod.erl", [{outdir, "foo"}])),
-       ?_assertEqual("foo", F("foo/mod.erl" , [])),
-       ?_assertEqual(Good , F("good/mod.erl", []))
-     ]
-   }].
 
 do_module_modified_mtime_p_test_() ->
   CTime1 = {time, {1, 1, 1, 1, 1, 1}},

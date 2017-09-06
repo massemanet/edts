@@ -6,6 +6,8 @@ elisp/erlang-mode
 elisp/ert
 lib/*
 !lib/edts
+lib/edts/_build/
+lib/edts/rebar.lock
 log
 edts-autoloads.el
 erl_crash.dump
