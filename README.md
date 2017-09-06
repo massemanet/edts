@@ -111,10 +111,10 @@ An easy way is to load edts-start:
   - `lib-dirs <list of strings>`
 
   A list of paths (relative to the project's root) where the project's code is
-  located. All subdirectories of lib-dirs are assumed to be otp-applications.
+  located. All subdirectories of lib-dirs are assumed to be otp-applications.
   If you're using rebar, this variable should contain your deps_dir and all
   lib_dirs from your rebar.config.
-  Defaults to `'("lib" "deps")`.
+  Defaults to `'("lib" "deps" "_build/test/lib" "_build/default/lib")`.
 
   - `start-command <string>`
 
